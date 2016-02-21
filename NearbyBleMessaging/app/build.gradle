@@ -11,10 +11,23 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        config {
+            storeFile file("D:\\Google Drive\\2. Projects\\messaging_keystore.jks")
+            storePassword "nearbyblemessaging"      // Exposed passwords, only because this is a demo
+            keyAlias "AndroidMessagingKey"
+            keyPassword "nearbyblemessaging"
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.config
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            signingConfig signingConfigs.config
         }
     }
 }
@@ -23,4 +36,5 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:23.1.1'
+    compile 'com.google.android.gms:play-services-nearby:8.4.0'
 }
