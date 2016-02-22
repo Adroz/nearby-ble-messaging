@@ -8,12 +8,16 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ListView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.nearby.Nearby;
+
+import java.util.ArrayList;
 
 /**
  * Fragment that allows for user to transmit messages to nearby devices, and to also receive
@@ -29,6 +33,10 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     // Views.
     private EditText mMessageText;
     private Button mSendButton;
+
+    // Messages list adapter and array
+    private ArrayAdapter<String> mNearbyDevicesArrayAdapter;
+    private final ArrayList<String> mNearbyDevicesArrayList = new ArrayList<>();
 
     private GoogleApiClient mGoogleApiClient;   // Google play services - for Nearby API
 
@@ -47,6 +55,13 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
 
         mMessageText = (EditText) rootView.findViewById(R.id.message_edit_text);
         mSendButton = (Button) rootView.findViewById(R.id.send_button);
+
+        final ListView nearbyDevicesListView = (ListView) rootView.findViewById(
+                R.id.message_list_view);
+        mNearbyDevicesArrayAdapter = new ArrayAdapter<>(getActivity().getApplicationContext(),
+                android.R.layout.simple_list_item_1,
+                mNearbyDevicesArrayList);
+        nearbyDevicesListView.setAdapter(mNearbyDevicesArrayAdapter);
 
         return rootView;
     }
