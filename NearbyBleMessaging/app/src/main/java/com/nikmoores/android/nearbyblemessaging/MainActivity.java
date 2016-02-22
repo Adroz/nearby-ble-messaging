@@ -1,8 +1,11 @@
 package com.nikmoores.android.nearbyblemessaging;
 
+import android.app.Activity;
 import android.app.FragmentManager;
-import android.support.v7.app.AppCompatActivity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
+import android.widget.Toast;
 
 /*
 Application "Goals"
@@ -34,7 +37,9 @@ Application "Goals"
 
 
 public class MainActivity extends AppCompatActivity {
-    private static final String CHAT_FRAGMENT_TAG = "chat_fragment_tag";
+    public static final String CHAT_FRAGMENT_TAG = "chat_fragment_tag";
+
+    public static final int RESOLVE_ERROR_REQUEST = 1001;
 
     private ChatFragment mChatFragment;
 
@@ -51,4 +56,25 @@ public class MainActivity extends AppCompatActivity {
             fm.beginTransaction().add(R.id.container, mChatFragment, CHAT_FRAGMENT_TAG).commit();
         }
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        mChatFragment.setResolvingNearbyError(false);
+        // Nearby opt-in dialog was shown.
+        if (requestCode == RESOLVE_ERROR_REQUEST) {
+            if (resultCode == Activity.RESULT_OK) {
+                // User selected "Allow". Send previously unsent message
+                mChatFragment.publishExisting();
+            } else if (resultCode == Activity.RESULT_CANCELED) {
+                // User selected "Deny". Can't proceed with subscribe/publish.
+                Toast.makeText(this, "Messages can't be sent and received if you deny the Nearby " +
+                        "permission request!", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Failed to resolve error with code " + resultCode,
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
 }

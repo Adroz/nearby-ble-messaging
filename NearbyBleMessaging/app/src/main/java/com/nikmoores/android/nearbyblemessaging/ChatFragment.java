@@ -1,6 +1,7 @@
 package com.nikmoores.android.nearbyblemessaging;
 
 import android.app.Fragment;
+import android.content.IntentSender;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -12,10 +13,18 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.nearby.Nearby;
+import com.google.android.gms.nearby.messages.Message;
+import com.google.android.gms.nearby.messages.NearbyMessagesStatusCodes;
+import com.google.android.gms.nearby.messages.PublishCallback;
+import com.google.android.gms.nearby.messages.PublishOptions;
+import com.google.android.gms.nearby.messages.Strategy;
 
 import java.util.ArrayList;
 
@@ -33,6 +42,20 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     // Views.
     private EditText mMessageText;
     private Button mSendButton;
+
+    private Message mMessagePacket;
+
+    /**
+     * The string containing any unsent message. The message will be sent after the user agrees to
+     * the Nearby permission.
+     */
+    private String mUnsentMessage;
+
+    /**
+     * Flag for resolving Nearby permission opt-in error. Used to prevent duplicate permission
+     * dialog.
+     */
+    private boolean mResolvingNearbyError = false;
 
     // Messages list adapter and array
     private ArrayAdapter<String> mNearbyDevicesArrayAdapter;
@@ -55,6 +78,12 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
 
         mMessageText = (EditText) rootView.findViewById(R.id.message_edit_text);
         mSendButton = (Button) rootView.findViewById(R.id.send_button);
+        mSendButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                publish(mMessageText.getText().toString());
+            }
+        });
 
         final ListView nearbyDevicesListView = (ListView) rootView.findViewById(
                 R.id.message_list_view);
@@ -87,6 +116,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     public void onStop() {
         if (mGoogleApiClient.isConnected() && !getActivity().isChangingConfigurations()) {
             mGoogleApiClient.disconnect();
+            unpublish();
         }
         super.onStop();
     }
@@ -115,5 +145,108 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // https://developers.google.com/android/guides/api-client#handle_connection_failures
         mSendButton.setEnabled(false);
         mSendButton.setTag(connectionResult.getErrorCode());
+    }
+
+    /**
+     * Attempts to publish message to nearby BLE devices.
+     * Publishes device information to nearby devices. If not successful, attempts to resolve any
+     * error related to Nearby permissions by displaying an opt-in dialog. Registers a callback
+     * that updates the UI when the publication expires.
+     */
+    private void publish(String messageToSend) {
+        mUnsentMessage = messageToSend;
+        // Cannot proceed without a connected GoogleApiClient.
+        if (connectToApiClient()) {
+
+            PublishOptions options = new PublishOptions.Builder()
+                    .setStrategy(Strategy.DEFAULT)
+                    .setCallback(new PublishCallback() {
+                        @Override
+                        public void onExpired() {
+                            super.onExpired();
+                            Log.i(LOG_TAG, "No longer publishing");
+                        }
+                    }).build();
+
+            // Let the user know that their message has been shortened if it's too long.
+            if (messageToSend.length() >= Message.MAX_CONTENT_SIZE_BYTES) {
+                Toast.makeText(getActivity(), "Your message was too long and has been truncated.",
+                        Toast.LENGTH_SHORT).show();
+                messageToSend = messageToSend.substring(0, Message.MAX_CONTENT_SIZE_BYTES);
+            }
+
+            // Start with anonymous username. TODO: Add ability to change display name
+            final String finalMessage = "Anonymous: " + messageToSend;
+            mMessagePacket = new Message(finalMessage.getBytes());
+
+            Nearby.Messages.publish(mGoogleApiClient, mMessagePacket, options)
+                    .setResultCallback(new ResultCallback<Status>() {
+
+                        @Override
+                        public void onResult(@NonNull Status status) {
+                            if (status.isSuccess()) {
+                                mNearbyDevicesArrayAdapter.add(finalMessage);
+                                mMessageText.setText("");
+                                mUnsentMessage = "";
+                            } else {
+                                handleNearbyError(status);
+                            }
+                        }
+                    });
+        }
+    }
+
+    /**
+     * Method attempts to stop publishing message data (if running).device information to nearby devices. If successful, resets state. If not
+     * successful, attempts to resolve any error related to Nearby permissions by displaying an
+     * opt-in dialog.
+     */
+    private void unpublish() {
+        // Cannot proceed without a connected GoogleApiClient. Reconnect and execute the pending
+        // task in onConnected().
+        if (connectToApiClient()) {
+            // Use last message packet, as required by the Nearby API, to unpublish.
+            // There are no issues if unpublish was to fail, so don't listen.
+            Nearby.Messages.unpublish(mGoogleApiClient, mMessagePacket);
+        }
+    }
+
+    public void publishExisting() {
+        if (!mUnsentMessage.equals("")) {
+            publish(mUnsentMessage);
+        }
+    }
+
+    private boolean connectToApiClient() {
+        if (!mGoogleApiClient.isConnected()) {
+            if (!mGoogleApiClient.isConnecting()) {
+                mGoogleApiClient.connect();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected void setResolvingNearbyError(boolean state) {
+        mResolvingNearbyError = state;
+    }
+
+    /**
+     * Handles errors associated with Nearby permission requests.
+     *
+     * @param status The error status.
+     */
+    private void handleNearbyError(Status status) {
+        if (status.getStatusCode() == NearbyMessagesStatusCodes.APP_NOT_OPTED_IN) {
+            if (!mResolvingNearbyError) {
+                try {
+                    mResolvingNearbyError = true;
+                    status.startResolutionForResult(getActivity(), MainActivity.RESOLVE_ERROR_REQUEST);
+
+                } catch (IntentSender.SendIntentException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }
