@@ -8,7 +8,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
+import android.widget.Button;
+import android.widget.EditText;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -25,6 +26,10 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
 
     private static final String LOG_TAG = ChatFragment.class.getSimpleName();
 
+    // Views.
+    private EditText mMessageText;
+    private Button mSendButton;
+
     private GoogleApiClient mGoogleApiClient;   // Google play services - for Nearby API
 
     public ChatFragment() {
@@ -38,7 +43,12 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_chat, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_chat, container, false);
+
+        mMessageText = (EditText) rootView.findViewById(R.id.message_edit_text);
+        mSendButton = (Button) rootView.findViewById(R.id.send_button);
+
+        return rootView;
     }
 
     @Override
@@ -69,6 +79,9 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.i(LOG_TAG, "GoogleApiClient connected");
+        mSendButton.setEnabled(true);
+        // Set the view's tag as a quick and dirty way of testing what happens with each connection state.
+        mSendButton.setTag(ConnectionResult.SUCCESS);
     }
 
     @Override
@@ -76,6 +89,8 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         Log.i(LOG_TAG, "GoogleApiClient connection suspended, error: " + i);
         // Disable any UI elements that rely on the API until it is reconnected. In this point,
         // there is nothing to disable.
+        mSendButton.setEnabled(false);
+        mSendButton.setTag(i);
     }
 
     @Override
@@ -83,6 +98,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         Log.i(LOG_TAG, "GoogleApiClient connection failed.");
         // Not handled as of yet. GoogleApiClient onConnectionFailed guideline found at:
         // https://developers.google.com/android/guides/api-client#handle_connection_failures
-        Toast.makeText(getActivity(), "blah", Toast.LENGTH_SHORT).show();
+        mSendButton.setEnabled(false);
+        mSendButton.setTag(connectionResult.getErrorCode());
     }
 }
