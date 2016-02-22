@@ -89,7 +89,10 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                publish(mMessageText.getText().toString());
+                if(mMessageText.getText().toString().length() != 0){
+                    mSendButton.setEnabled(false);
+                    publish(mMessageText.getText().toString());
+                }
             }
         });
 
@@ -209,6 +212,8 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                             } else {
                                 handleNearbyError(status);
                             }
+
+                            mSendButton.setEnabled(true);
                         }
                     });
         }
