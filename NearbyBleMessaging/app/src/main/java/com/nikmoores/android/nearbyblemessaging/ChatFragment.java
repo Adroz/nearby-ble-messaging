@@ -21,10 +21,13 @@ import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.messages.Message;
+import com.google.android.gms.nearby.messages.MessageListener;
 import com.google.android.gms.nearby.messages.NearbyMessagesStatusCodes;
 import com.google.android.gms.nearby.messages.PublishCallback;
 import com.google.android.gms.nearby.messages.PublishOptions;
 import com.google.android.gms.nearby.messages.Strategy;
+import com.google.android.gms.nearby.messages.SubscribeCallback;
+import com.google.android.gms.nearby.messages.SubscribeOptions;
 
 import java.util.ArrayList;
 
@@ -44,6 +47,11 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     private Button mSendButton;
 
     private Message mMessagePacket;
+
+    /**
+     * A {@link MessageListener} to process incoming messages.
+     */
+    private MessageListener mMessageListener;
 
     /**
      * The string containing any unsent message. The message will be sent after the user agrees to
@@ -92,6 +100,9 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                 mNearbyDevicesArrayList);
         nearbyDevicesListView.setAdapter(mNearbyDevicesArrayAdapter);
 
+        setupMessageListener();
+        mMessagePacket = new Message(new byte[0]);
+
         return rootView;
     }
 
@@ -116,6 +127,8 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     public void onStop() {
         if (mGoogleApiClient.isConnected() && !getActivity().isChangingConfigurations()) {
             mGoogleApiClient.disconnect();
+
+            unsubscribe();
             unpublish();
         }
         super.onStop();
@@ -127,6 +140,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         mSendButton.setEnabled(true);
         // Set the view's tag as a quick and dirty way of testing what happens with each connection state.
         mSendButton.setTag(ConnectionResult.SUCCESS);
+        subscribe();
     }
 
     @Override
@@ -154,7 +168,11 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
      * that updates the UI when the publication expires.
      */
     private void publish(String messageToSend) {
+        // Unpublish existing
+        unpublish();
+
         mUnsentMessage = messageToSend;
+
         // Cannot proceed without a connected GoogleApiClient.
         if (connectToApiClient()) {
 
@@ -217,7 +235,85 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         }
     }
 
-    private boolean connectToApiClient() {
+    /**
+     * Subscribe to messages from nearby BLE devices. If unsuccessful due to Nearby permissions not
+     * agreed to, display dialog.
+     */
+    private void subscribe() {
+        // Cannot proceed without a connected GoogleApiClient. Reconnect and execute the pending
+        // task in onConnected().
+        if (connectToApiClient()) {
+            SubscribeOptions options = new SubscribeOptions.Builder()
+                    .setStrategy(Strategy.DEFAULT) // Only use BLE.
+                    .setCallback(new SubscribeCallback() {
+                        @Override
+                        public void onExpired() {
+                            super.onExpired();
+                            // For now, do nothing - will want to be notified so we can sub again
+                            Log.i(LOG_TAG, "No longer subscribing");
+                        }
+                    }).build();
+
+            Nearby.Messages.subscribe(mGoogleApiClient, mMessageListener, options)
+                    .setResultCallback(new ResultCallback<Status>() {
+
+                        @Override
+                        public void onResult(@NonNull Status status) {
+                            if (!status.isSuccess()) {
+                                handleNearbyError(status);
+                            }
+                        }
+                    });
+        }
+    }
+
+    /**
+     * Method ends subscription to incoming messages.
+     */
+    private void unsubscribe() {
+        // Cannot proceed without a connected GoogleApiClient. Reconnect and execute the pending
+        // task in onConnected().
+        if (connectToApiClient()) {
+            Nearby.Messages.unsubscribe(mGoogleApiClient, mMessageListener)
+                    .setResultCallback(new ResultCallback<Status>() {
+
+                        @Override
+                        public void onResult(Status status) {
+                            if (!status.isSuccess()) {
+                                handleNearbyError(status);
+                            }
+                        }
+                    });
+        }
+    }
+
+    private void setupMessageListener() {
+        mMessageListener = new MessageListener() {
+            @Override
+            public void onFound(Message message) {
+                // There are two main ways of handling sending/receiving messages:
+                // 1) Match a timestamp so that repeated messages are ignored (but allowing for
+                //    newly connected devices to receive the messages.
+                // 2) Alter the sending service to only broadcast for a short interval (but that
+                //    might mean that other devices miss the message altogether).
+
+                // Basic way of checking if the message received is a duplicate. Not advised for
+                // when three people are talking, as it could result in a loop of repeated incoming
+                // messages.
+                // TODO: add timestamps, and timestamp checks.
+                String messageIn = new String(message.getContent());
+                int arrayCount = mNearbyDevicesArrayAdapter.getCount();
+                if (arrayCount > 0) {
+                    if (mNearbyDevicesArrayAdapter.getItem(arrayCount - 1).equals(messageIn)) {
+                        return;
+                    }
+                }
+                mNearbyDevicesArrayAdapter.add(new String(message.getContent()));
+            }
+        };
+    }
+
+    public boolean connectToApiClient() {
         if (!mGoogleApiClient.isConnected()) {
             if (!mGoogleApiClient.isConnecting()) {
                 mGoogleApiClient.connect();
