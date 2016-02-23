@@ -292,6 +292,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // Cannot proceed without a connected GoogleApiClient. Reconnect and execute the pending
         // task in onConnected().
         if (connectToApiClient()) {
+            // TODO: If we're interested in BLE Beacons only, we can use setStrategy(Strategy.BLE). I didn't have time for both in this implementation.
             SubscribeOptions options = new SubscribeOptions.Builder()
                     .setStrategy(Strategy.DEFAULT)
                     .setCallback(new SubscribeCallback() {
