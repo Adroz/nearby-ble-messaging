@@ -66,7 +66,7 @@ public class ChatFragmentTests extends ActivityInstrumentationTestCase2<MainActi
     }
 
     public void testNearbyMessageImplementation() {
-        NearbyMessage nearbyMessage1 = new NearbyMessage("123", "Nik");
+        NearbyMessage nearbyMessage1 = new NearbyMessage("123", "Nik", 1234567L, "Message Body!");
 
         // Test InstanceID in == InstanceID out
         assertEquals("Error: the InstanceID returned was not as expected",

@@ -26,11 +26,11 @@ public class NearbyMessage {
     private long mTimestamp;
     private String mMessageBody;
 
-    public NearbyMessage(String instanceId, String username) {
+    public NearbyMessage(String instanceId, String username, long timestamp, String messageBody) {
         this.mInstanceId = instanceId;
         this.mUsername = username;
-        this.mTimestamp = 0L;
-        this.mMessageBody = "";
+        this.mTimestamp = timestamp;
+        this.mMessageBody = messageBody;
         // TODO: Could add color, etc.
     }
 

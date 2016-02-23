@@ -43,11 +43,20 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
 
     private static final String LOG_TAG = ChatFragment.class.getSimpleName();
 
+    private static final String DEFAULT_NAME = "Anonymous";
+
     // Views.
+    private EditText mUsernameText;
     private EditText mMessageText;
     private Button mSendButton;
 
     private NearbyMessage mNearbyMessage;
+    private ArrayList<NearbyMessage> mMessageList = new ArrayList<>();
+
+    /**
+     * The unique ID for this app instance.
+     */
+    private String mId;
 
     /**
      * A {@link MessageListener} to process incoming messages.
@@ -85,6 +94,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_chat, container, false);
 
+        mUsernameText = (EditText) rootView.findViewById(R.id.username_edit_text);
         mMessageText = (EditText) rootView.findViewById(R.id.message_edit_text);
         mSendButton = (Button) rootView.findViewById(R.id.send_button);
         mSendButton.setOnClickListener(new View.OnClickListener() {
@@ -118,10 +128,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     public void onStart() {
         super.onStart();
 
-        mNearbyMessage = new NearbyMessage(
-                InstanceID.getInstance(getActivity().getApplicationContext()).getId(),
-                "Anonymous"
-        );
+        mId = InstanceID.getInstance(getActivity().getApplicationContext()).getId();
 
         mGoogleApiClient = new GoogleApiClient.Builder(getActivity())
                 .addApi(Nearby.MESSAGES_API)
@@ -201,11 +208,13 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                         Toast.LENGTH_SHORT).show();
                 messageToSend = messageToSend.substring(0, Message.MAX_CONTENT_SIZE_BYTES);
             }
-            mNearbyMessage.setTimestamp(System.currentTimeMillis());
-            mNearbyMessage.setMessageBody(messageToSend);
-
-            // Start with anonymous username. TODO: Add ability to change display name
-            final String finalMessage = messageToSend;
+            String username = mUsernameText.getText().toString().trim();
+            mNearbyMessage = new NearbyMessage(
+                    mId,
+                    (username.length() == 0) ? DEFAULT_NAME : username,
+                    System.currentTimeMillis(),
+                    messageToSend.trim()
+            );
 
             Nearby.Messages.publish(mGoogleApiClient, NearbyMessage.getMessage(mNearbyMessage), options)
                     .setResultCallback(new ResultCallback<Status>() {
@@ -213,7 +222,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                         @Override
                         public void onResult(@NonNull Status status) {
                             if (status.isSuccess()) {
-                                mNearbyDevicesArrayAdapter.add(finalMessage);
+                                populateMessage(mNearbyMessage);
                                 mMessageText.setText("");
                                 mUnsentMessageBody = "";
                             } else {
@@ -224,6 +233,18 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                         }
                     });
         }
+    }
+
+    private void populateMessage(NearbyMessage nearbyMessage) {
+        for (NearbyMessage nM : mMessageList) {
+            if (nM.getInstanceId().equals(nearbyMessage.getInstanceId()) &&
+                    nM.getTimestamp() == nearbyMessage.getTimestamp()) {
+                return;
+            }
+        }
+        mMessageList.add(nearbyMessage);
+        String displayString = nearbyMessage.getUsername() + ": " + nearbyMessage.getMessageBody();
+        mNearbyDevicesArrayAdapter.add(displayString);
     }
 
     /**
@@ -303,15 +324,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         mMessageListener = new MessageListener() {
             @Override
             public void onFound(Message message) {
-                // There are two main ways of handling sending/receiving messages:
-                // 1) Match a timestamp so that repeated messages are ignored (but allowing for
-                //    newly connected devices to receive the messages.
-                // 2) Alter the sending service to only broadcast for a short interval (but that
-                //    might mean that other devices miss the message altogether).
-
-                // TODO: add timestamps, and timestamp checks.
-                String messageBody = NearbyMessage.getNearbyMessage(message).getMessageBody();
-                mNearbyDevicesArrayAdapter.add(messageBody);
+                populateMessage(NearbyMessage.getNearbyMessage(message));
             }
         };
     }
