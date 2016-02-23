@@ -41,8 +41,14 @@ import java.util.ArrayList;
 public class ChatFragment extends Fragment implements GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener {
 
+    /**
+     * Class name for Logging.
+     */
     private static final String LOG_TAG = ChatFragment.class.getSimpleName();
 
+    /**
+     * Default name displayed when no name has been set by the user.
+     */
     private static final String DEFAULT_NAME = "Anonymous";
 
     // Views.
@@ -50,8 +56,14 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     private EditText mMessageText;
     private Button mSendButton;
 
+    // Message instance
     private NearbyMessage mNearbyMessage;
     private ArrayList<NearbyMessage> mMessageList = new ArrayList<>();
+
+    /**
+     * The current connection status
+     */
+    private int mConnectionStatus;
 
     /**
      * The unique ID for this app instance.
@@ -150,12 +162,16 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         super.onStop();
     }
 
+    public int getConnectionStatus(){
+        return mConnectionStatus;
+    }
+
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.i(LOG_TAG, "GoogleApiClient connected");
         mSendButton.setEnabled(true);
         // Set the view's tag as a quick and dirty way of testing what happens with each connection state.
-        mSendButton.setTag(ConnectionResult.SUCCESS);
+        mConnectionStatus = ConnectionResult.SUCCESS;
         subscribe();
     }
 
@@ -165,7 +181,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // Disable any UI elements that rely on the API until it is reconnected. In this point,
         // there is nothing to disable.
         mSendButton.setEnabled(false);
-        mSendButton.setTag(i);
+        mConnectionStatus = i;
     }
 
     @Override
@@ -174,7 +190,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // Not handled as of yet. GoogleApiClient onConnectionFailed guideline found at:
         // https://developers.google.com/android/guides/api-client#handle_connection_failures
         mSendButton.setEnabled(false);
-        mSendButton.setTag(connectionResult.getErrorCode());
+        mConnectionStatus = connectionResult.getErrorCode();
     }
 
     /**
@@ -277,7 +293,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // task in onConnected().
         if (connectToApiClient()) {
             SubscribeOptions options = new SubscribeOptions.Builder()
-                    .setStrategy(Strategy.DEFAULT) // Only use BLE.
+                    .setStrategy(Strategy.DEFAULT)
                     .setCallback(new SubscribeCallback() {
                         @Override
                         public void onExpired() {

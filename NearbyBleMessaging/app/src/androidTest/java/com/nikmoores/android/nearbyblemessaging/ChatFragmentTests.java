@@ -49,22 +49,26 @@ public class ChatFragmentTests extends ActivityInstrumentationTestCase2<MainActi
         assertFalse("Error: Send button should be disabled if not connected", sendButton.isEnabled());
         assertEquals("Error: Connection error doesn't equal input error",
                 testResult.getErrorCode(),
-                (int) sendButton.getTag());
+                chatFragment.getConnectionStatus());
 
         chatFragment.onConnectionSuspended(GoogleApiClient.ConnectionCallbacks.CAUSE_NETWORK_LOST);
         assertFalse("Error: Send button should be disabled if not connected", sendButton.isEnabled());
         assertEquals("Error: Connection error doesn't equal input error",
                 GoogleApiClient.ConnectionCallbacks.CAUSE_NETWORK_LOST,
-                (int) sendButton.getTag());
+                chatFragment.getConnectionStatus());
 
         chatFragment.onConnected(null);
         assertTrue("Error: Send button should be enabled when connected", sendButton.isEnabled());
         assertEquals("Error: Connection result should be SUCCESS (0)",
                 ConnectionResult.SUCCESS,
-                (int) sendButton.getTag());
+                chatFragment.getConnectionStatus());
 
     }
 
+    /**
+     * Tests that the NearbyMessage is implemented properly. Check for setting and getting correctly
+     * and for translating between NearMessages and Messages.
+     */
     public void testNearbyMessageImplementation() {
         NearbyMessage nearbyMessage1 = new NearbyMessage("123", "Nik", 1234567L, "Message Body!");
 

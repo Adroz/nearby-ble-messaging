@@ -37,8 +37,14 @@ Application "Goals"
 
 
 public class MainActivity extends AppCompatActivity {
+    /**
+     * Fragment tag for tracking.
+     */
     public static final String CHAT_FRAGMENT_TAG = "chat_fragment_tag";
 
+    /**
+     * Request code to link to onActivityOnRequest call.
+     */
     public static final int RESOLVE_ERROR_REQUEST = 1001;
 
     private ChatFragment mChatFragment;

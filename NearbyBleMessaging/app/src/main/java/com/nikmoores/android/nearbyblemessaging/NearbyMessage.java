@@ -20,6 +20,7 @@ public class NearbyMessage {
      * sending device broadcasts the message several times). For future releases it can be used to
      * block unwanted users in your chat window and could be used to update attached ListViews to
      * reflect username and user color changes, etc.
+     * -- Cannot be changed --
      */
     private final String mInstanceId;
     private String mUsername;
