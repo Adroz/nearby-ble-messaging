@@ -19,6 +19,7 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
+import com.google.android.gms.iid.InstanceID;
 import com.google.android.gms.nearby.Nearby;
 import com.google.android.gms.nearby.messages.Message;
 import com.google.android.gms.nearby.messages.MessageListener;
@@ -46,7 +47,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     private EditText mMessageText;
     private Button mSendButton;
 
-    private Message mMessagePacket;
+    private NearbyMessage mNearbyMessage;
 
     /**
      * A {@link MessageListener} to process incoming messages.
@@ -57,7 +58,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
      * The string containing any unsent message. The message will be sent after the user agrees to
      * the Nearby permission.
      */
-    private String mUnsentMessage;
+    private String mUnsentMessageBody;
 
     /**
      * Flag for resolving Nearby permission opt-in error. Used to prevent duplicate permission
@@ -89,7 +90,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(mMessageText.getText().toString().length() != 0){
+                if (mMessageText.getText().toString().length() != 0) {
                     mSendButton.setEnabled(false);
                     publish(mMessageText.getText().toString());
                 }
@@ -104,7 +105,6 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         nearbyDevicesListView.setAdapter(mNearbyDevicesArrayAdapter);
 
         setupMessageListener();
-        mMessagePacket = new Message(new byte[0]);
 
         return rootView;
     }
@@ -118,6 +118,11 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     public void onStart() {
         super.onStart();
 
+        mNearbyMessage = new NearbyMessage(
+                InstanceID.getInstance(getActivity().getApplicationContext()).getId(),
+                "Anonymous"
+        );
+
         mGoogleApiClient = new GoogleApiClient.Builder(getActivity())
                 .addApi(Nearby.MESSAGES_API)
                 .addConnectionCallbacks(this)
@@ -129,10 +134,11 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
     @Override
     public void onStop() {
         if (mGoogleApiClient.isConnected() && !getActivity().isChangingConfigurations()) {
-            mGoogleApiClient.disconnect();
 
             unsubscribe();
             unpublish();
+
+            mGoogleApiClient.disconnect();
         }
         super.onStop();
     }
@@ -174,7 +180,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         // Unpublish existing
         unpublish();
 
-        mUnsentMessage = messageToSend;
+        mUnsentMessageBody = messageToSend;
 
         // Cannot proceed without a connected GoogleApiClient.
         if (connectToApiClient()) {
@@ -195,12 +201,13 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                         Toast.LENGTH_SHORT).show();
                 messageToSend = messageToSend.substring(0, Message.MAX_CONTENT_SIZE_BYTES);
             }
+            mNearbyMessage.setTimestamp(System.currentTimeMillis());
+            mNearbyMessage.setMessageBody(messageToSend);
 
             // Start with anonymous username. TODO: Add ability to change display name
-            final String finalMessage = "Anonymous: " + messageToSend;
-            mMessagePacket = new Message(finalMessage.getBytes());
+            final String finalMessage = messageToSend;
 
-            Nearby.Messages.publish(mGoogleApiClient, mMessagePacket, options)
+            Nearby.Messages.publish(mGoogleApiClient, NearbyMessage.getMessage(mNearbyMessage), options)
                     .setResultCallback(new ResultCallback<Status>() {
 
                         @Override
@@ -208,7 +215,7 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                             if (status.isSuccess()) {
                                 mNearbyDevicesArrayAdapter.add(finalMessage);
                                 mMessageText.setText("");
-                                mUnsentMessage = "";
+                                mUnsentMessageBody = "";
                             } else {
                                 handleNearbyError(status);
                             }
@@ -230,13 +237,13 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
         if (connectToApiClient()) {
             // Use last message packet, as required by the Nearby API, to unpublish.
             // There are no issues if unpublish was to fail, so don't listen.
-            Nearby.Messages.unpublish(mGoogleApiClient, mMessagePacket);
+            Nearby.Messages.unpublish(mGoogleApiClient, NearbyMessage.getMessage(mNearbyMessage));
         }
     }
 
     public void publishExisting() {
-        if (!mUnsentMessage.equals("")) {
-            publish(mUnsentMessage);
+        if (!mUnsentMessageBody.equals("")) {
+            publish(mUnsentMessageBody);
         }
     }
 
@@ -302,18 +309,9 @@ public class ChatFragment extends Fragment implements GoogleApiClient.Connection
                 // 2) Alter the sending service to only broadcast for a short interval (but that
                 //    might mean that other devices miss the message altogether).
 
-                // Basic way of checking if the message received is a duplicate. Not advised for
-                // when three people are talking, as it could result in a loop of repeated incoming
-                // messages.
                 // TODO: add timestamps, and timestamp checks.
-                String messageIn = new String(message.getContent());
-                int arrayCount = mNearbyDevicesArrayAdapter.getCount();
-                if (arrayCount > 0) {
-                    if (mNearbyDevicesArrayAdapter.getItem(arrayCount - 1).equals(messageIn)) {
-                        return;
-                    }
-                }
-                mNearbyDevicesArrayAdapter.add(new String(message.getContent()));
+                String messageBody = NearbyMessage.getNearbyMessage(message).getMessageBody();
+                mNearbyDevicesArrayAdapter.add(messageBody);
             }
         };
     }

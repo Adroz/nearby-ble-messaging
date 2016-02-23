@@ -10,7 +10,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 
 /**
  * Instrumentation tests for the connection, sending and receiving of the Nearby Messages API.
- *
+ * <p/>
  * Created by Nik on 22/02/2016.
  */
 public class ChatFragmentTests extends ActivityInstrumentationTestCase2<MainActivity> {
@@ -63,5 +63,33 @@ public class ChatFragmentTests extends ActivityInstrumentationTestCase2<MainActi
                 ConnectionResult.SUCCESS,
                 (int) sendButton.getTag());
 
+    }
+
+    public void testNearbyMessageImplementation() {
+        NearbyMessage nearbyMessage1 = new NearbyMessage("123", "Nik");
+
+        // Test InstanceID in == InstanceID out
+        assertEquals("Error: the InstanceID returned was not as expected",
+                "123", nearbyMessage1.getInstanceId());
+
+        // Test that the Username/Timestamp/MessageBody can be altered
+        assertEquals("Error: the username returned was not as expected",
+                "Nik", nearbyMessage1.getUsername());
+        nearbyMessage1.setUsername("Ben");
+        assertEquals("Error: the username was not altered was not as expected",
+                "Ben", nearbyMessage1.getUsername());
+
+        // Test that NearbyMessage->Message->NearbyMessage is as expected.
+        NearbyMessage nearbyMessage2 = NearbyMessage.getNearbyMessage(
+                NearbyMessage.getMessage(nearbyMessage1));
+
+        assertEquals("Error: InstanceID not converted correctly",
+                nearbyMessage1.getInstanceId(), nearbyMessage2.getInstanceId());
+        assertEquals("Error: Username not converted correctly",
+                nearbyMessage1.getUsername(), nearbyMessage2.getUsername());
+        assertEquals("Error: Timestamp not converted correctly",
+                nearbyMessage1.getTimestamp(), nearbyMessage2.getTimestamp());
+        assertEquals("Error: Message not converted correctly",
+                nearbyMessage1.getMessageBody(), nearbyMessage2.getMessageBody());
     }
 }
